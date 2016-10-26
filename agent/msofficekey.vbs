@@ -18,7 +18,7 @@ aOffID(3,1) = "14.0"
 aOffID(4,0) = "2013"
 aOffID(4,1) = "15.0"
 aOffID(5,0) = "2016"
-aOffID(5.1) = "16.0"
+aOffID(5,1) = "16.0"
 
 Set oCtx = CreateObject("WbemScripting.SWbemNamedValueSet")
 oCtx.Add "__ProviderArchitecture", 64
@@ -50,6 +50,7 @@ Sub schKey97(regKey)
   If IsNull(oProd) Then
     oInstall = "0"
     oProd = "Microsoft Office 97"
+    oVers = "97"
   End If
   writeXML "97",oProd,oProdID,32,"",oInstall,"",""
 End Sub
@@ -71,6 +72,7 @@ Sub schKey2K(name, regKey, guid1, guid2)
         For i = LBound(guid1) To UBound(guid1)
           If UCase(Left(guid,Len(guid1(i)) + 1)) = "{" & guid1(i) Then
             oReg.GetStringValue HKEY_LOCAL_MACHINE, "Software\" & wow & "Microsoft\Windows\CurrentVersion\Uninstall\" & guid, "DisplayName", oProd
+            oReg.GetStringValue HKEY_LOCAL_MACHINE, "Software\" & wow & "Microsoft\Windows\CurrentVersion\Uninstall\" & guid, "DisplayVersion", oVers
             oGUID = guid
             oInstall = "1"
           End If
@@ -80,7 +82,8 @@ Sub schKey2K(name, regKey, guid1, guid2)
   End If
 
   If IsNull(oProd) Then oProd = "Microsoft " & name & " 2000"
-  writeXML "2000",oProd,oProdID,32,oGUID,oInstall,oKey,""
+  If IsNull(oVers) Then oVers = "2000"
+  writeXML oVers,oProd,oProdID,32,oGUID,oInstall,oKey,""
 End Sub
 
 Sub schKey(regKey, likeOS)
@@ -95,6 +98,7 @@ Sub schKey(regKey, likeOS)
   Else
     oVer = aOffID(a,0)
     oProd = Null
+    oVers = Null
     oKey = decodeKey(aDPIDBytes)
     oReg.GetStringValue HKEY_LOCAL_MACHINE, regKey, "ProductID", oProdID
     oBit = osType
@@ -105,27 +109,37 @@ Sub schKey(regKey, likeOS)
     If Not likeOS Then wow = "WOW6432Node\"
 
     oEdit = ""
-    If (oVer = "2010" Or oVer = "2013") Then
+    If (oVer = "2010" Or oVer = "2013" Or oVer = "2016") Then
       For i = 280 to 320 Step 2
         If aDPIDBytes(i) <> 0 Then oEdit = oEdit & Chr(aDPIDBytes(i))
       Next
     End If
     oNote = oEdit
 
-    If IsNull(oProd) And (oVer = "2010" Or oVer = "2013" Or oVer = "2016") Then
+    If IsNull(oProd) And (oVer = "2010" Or oVer = "2013"  Or oVer = "2016") Then
       kEdit = UCase(oEdit)
       If Mid(oGUID,11,4) = "003D" Then kEdit = "SingleImage"
       oReg.GetStringValue HKEY_LOCAL_MACHINE, "Software\" & wow & "Microsoft\Windows\CurrentVersion\Uninstall\Office" & Left(aOffID(a,1),2) & "." & kEdit, "DisplayName", oProd
+      oReg.GetStringValue HKEY_LOCAL_MACHINE, "Software\" & wow & "Microsoft\Windows\CurrentVersion\Uninstall\Office" & Left(aOffID(a,1),2) & "." & kEdit, "DisplayVersion", oVers
     End If
 
     If IsNull(oProd) Then _
       oReg.GetStringValue HKEY_LOCAL_MACHINE, "Software\" & wow & "Microsoft\Windows\CurrentVersion\Uninstall\" & oGUID, "DisplayName", oProd
-
+      
+    If IsNull(oVers) Then _
+      oReg.GetStringValue HKEY_LOCAL_MACHINE, "Software\" & wow & "Microsoft\Windows\CurrentVersion\Uninstall\" & oGUID, "DisplayVersion", oVers
+    
+    If IsNull(oVers) Then _
+      oVers = oVer
+      
     If IsNull(oProd) Then
       oInstall = "0"
       oReg.GetStringValue HKEY_LOCAL_MACHINE, regKey, "ProductName", oProd
-      If IsNull(oProd) Then oReg.GetStringValue HKEY_LOCAL_MACHINE, regKey, "ConvertToEdition", oProd
-
+      If IsNull(oProd) Then 
+         'oReg.GetStringValue HKEY_LOCAL_MACHINE, regKey, "ConvertToEdition", oProd
+         'oVers = "ConvertToEdition"
+      End If
+      
       ' Office Visio XP
       If IsNull(oProd) And (oVer = "XP") Then
         oReg.GetStringValue HKEY_LOCAL_MACHINE, "Software\" & wow & "Microsoft\Office\XP\Common\ProductVersion", "LastProduct", pVer
@@ -140,16 +154,16 @@ Sub schKey(regKey, likeOS)
         oProd = "Microsoft Office Visio Viewer 2003"
       End If
 
-      If IsNull(oProd) Then oProd = "Unidentifiable Office " & oVer
+      'If IsNull(oProd) Then oProd = "Unidentifiable Office " & oVer
     End If
-    writeXML oVer,oProd,oProdID,oBit,oGUID,oInstall,oKey,oNote
+    If Not IsNull(oProd) Then writeXML oVers,oProd,oProdID,oBit,oGUID,oInstall,oKey,oNote
   End If
 End Sub
 
-Sub writeXML(oVer,oProd,oProdID,oBit,oGUID,oInstall,oKey,oNote)
+Sub writeXML(oVers,oProd,oProdID,oBit,oGUID,oInstall,oKey,oNote)
   Wscript.Echo _
   "<OFFICEPACK>" & vbCrLf & _
-  "<OFFICEVERSION>" & oVer & "</OFFICEVERSION>" & vbCrLf & _
+  "<OFFICEVERSION>" & oVers & "</OFFICEVERSION>" & vbCrLf & _
   "<PRODUCT>" & oProd & "</PRODUCT>" & vbCrLf & _
   "<PRODUCTID>" & oProdID & "</PRODUCTID>" & vbCrLf & _
   "<TYPE>" & oBit & "</TYPE>" & vbCrLf & _
